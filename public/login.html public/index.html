@@ -1,1 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Screen Stream</title>
+    <style>
+        body { background:#111; color:white; text-align:center; }
+        img { width:90%; border:2px solid #444; margin-top:20px; }
+        input, button { padding:8px; margin:5px; }
+    </style>
+</head>
+<body>
 
+<h2>Viewer Panel</h2>
+
+<input id="pass" placeholder="Password">
+<button onclick="login()">Login</button>
+
+<br><br>
+
+<select id="devices"></select>
+<button onclick="start()">Connect</button>
+
+<img id="screen">
+
+<script>
+let token;
+let ws;
+
+async function login() {
+    const res = await fetch("/login", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({
+            password: document.getElementById("pass").value
+        })
+    });
+
+    const data = await res.json();
+    token = data.token;
+    alert("Logged in");
+}
+
+function start() {
+    ws = new WebSocket(location.origin.replace("https","wss").replace("http","ws"));
+
+    ws.binaryType = "arraybuffer";
+
+    ws.onopen = () => {
+        ws.send(JSON.stringify({
+            type: "auth",
+            role: "viewer",
+            token
+        }));
+    };
+
+    ws.onmessage = (e) => {
+
+        if (typeof e.data === "string") {
+            const msg = JSON.parse(e.data);
+
+            if (msg.type === "devices") {
+                const sel = document.getElementById("devices");
+                sel.innerHTML = "";
+
+                msg.list.forEach(id => {
+                    const opt = document.createElement("option");
+                    opt.value = id;
+                    opt.text = id;
+                    sel.appendChild(opt);
+                });
+            }
+        }
+
+        if (e.data instanceof ArrayBuffer) {
+            const blob = new Blob([e.data], { type:"image/jpeg" });
+            document.getElementById("screen").src = URL.createObjectURL(blob);
+        }
+    };
+}
+</script>
+
+</body>
+</html>
