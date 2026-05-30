@@ -1,169 +1,109 @@
+<!-- index.html -->
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-<meta charset="UTF-8">
-<title>Screen Control Panel</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Главная - Веб-приложение</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-<style>
-body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-    background: #0f1115;
-    color: #fff;
-}
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
 
-/* верхняя панель */
-.header {
-    padding: 15px;
-    background: #161a22;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid #2a2f3a;
-}
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+        }
 
-.title {
-    font-size: 18px;
-    font-weight: bold;
-    color: #4ea1ff;
-}
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
 
-/* контейнер */
-.container {
-    display: flex;
-    height: calc(100vh - 60px);
-}
+        .status {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 10px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
 
-/* боковая панель */
-.sidebar {
-    width: 280px;
-    background: #141821;
-    border-right: 1px solid #2a2f3a;
-    padding: 10px;
-    overflow-y: auto;
-}
+        .logout-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
 
-.device {
-    background: #1b2130;
-    padding: 12px;
-    margin: 8px 0;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: 0.2s;
-}
+        .logout-btn:hover {
+            transform: scale(1.05);
+            background: #c82333;
+        }
 
-.device:hover {
-    background: #273149;
-}
-
-.status {
-    font-size: 12px;
-    color: #8fd18f;
-}
-
-/* экран */
-.screen {
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background: #0b0d12;
-}
-
-.screen img {
-    width: 90%;
-    border-radius: 10px;
-    border: 2px solid #2a2f3a;
-    box-shadow: 0 0 20px rgba(0,0,0,0.6);
-}
-
-/* кнопка */
-button {
-    padding: 8px 12px;
-    background: #4ea1ff;
-    border: none;
-    border-radius: 6px;
-    color: white;
-    cursor: pointer;
-}
-</style>
+        .user-info {
+            font-size: 18px;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 10px;
+        }
+    </style>
 </head>
-
 <body>
-
-<div class="header">
-    <div class="title">🖥 Screen Control Panel</div>
-    <button onclick="connect()">Connect</button>
-</div>
-
-<div class="container">
-
-    <div class="sidebar">
-        <h3>Devices</h3>
-        <div id="devices"></div>
+    <div class="container">
+        <h1>Добро пожаловать!</h1>
+        <div class="status" id="status">Загрузка...</div>
+        <div class="user-info" id="userInfo"></div>
+        <button class="logout-btn" onclick="logout()">Выйти</button>
     </div>
 
-    <div class="screen">
-        <img id="screen">
-    </div>
-
-</div>
-
-<script>
-let ws;
-let token = localStorage.getItem("token");
-
-if (!token) {
-    window.location.href = "/login.html";
-}
-
-function connect() {
-    ws = new WebSocket(location.origin.replace("https","wss").replace("http","ws"));
-    ws.binaryType = "arraybuffer";
-
-    ws.onopen = () => {
-        ws.send(JSON.stringify({
-            type: "auth",
-            role: "viewer",
-            token: token
-        }));
-    };
-
-    ws.onmessage = (e) => {
-
-        // список устройств
-        if (typeof e.data === "string") {
-            const msg = JSON.parse(e.data);
-
-            if (msg.type === "devices") {
-                const box = document.getElementById("devices");
-                box.innerHTML = "";
-
-                msg.list.forEach(id => {
-                    const div = document.createElement("div");
-                    div.className = "device";
-                    div.innerHTML = `
-                        <b>${id}</b><br>
-                        <span class="status">online</span>
-                    `;
-
-                    div.onclick = () => {
-                        alert("Selected: " + id);
-                    };
-
-                    box.appendChild(div);
+    <script>
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/user', {
+                    credentials: 'include'
                 });
+                
+                if (response.ok) {
+                    const user = await response.json();
+                    document.getElementById('status').innerHTML = '✅ Вы авторизованы';
+                    document.getElementById('status').style.background = '#e8f5e9';
+                    document.getElementById('userInfo').innerHTML = `Пользователь: <strong>${user.username}</strong><br>ID: ${user.id}`;
+                } else {
+                    window.location.href = '/login.html';
+                }
+            } catch (error) {
+                window.location.href = '/login.html';
             }
         }
 
-        // экран
-        if (e.data instanceof ArrayBuffer) {
-            const blob = new Blob([e.data], { type:"image/jpeg" });
-            document.getElementById("screen").src = URL.createObjectURL(blob);
+        async function logout() {
+            await fetch('/api/logout', { method: 'POST', credentials: 'include' });
+            window.location.href = '/login.html';
         }
-    };
-}
-</script>
 
+        checkAuth();
+    </script>
 </body>
 </html>
