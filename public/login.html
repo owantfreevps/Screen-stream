@@ -1,1 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Login</title>
+    <style>
+        body {
+            background:#111;
+            color:white;
+            font-family: Arial;
+            text-align:center;
+            margin-top:120px;
+        }
 
+        input, button {
+            padding:10px;
+            margin:8px;
+            width:220px;
+            border:none;
+            border-radius:5px;
+        }
+
+        button {
+            background:#4CAF50;
+            color:white;
+            cursor:pointer;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Login</h2>
+
+<input id="pass" type="password" placeholder="Password">
+<br>
+<button onclick="login()">Login</button>
+
+<script>
+async function login() {
+    const password = document.getElementById("pass").value;
+
+    const res = await fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password })
+    });
+
+    if (!res.ok) {
+        alert("Wrong password");
+        return;
+    }
+
+    const data = await res.json();
+
+    localStorage.setItem("token", data.token);
+
+    window.location.href = "/index.html";
+}
+</script>
+
+</body>
+</html>
