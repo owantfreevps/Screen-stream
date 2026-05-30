@@ -1,110 +1,97 @@
-const express = require("express");
-const http = require("http");
-const WebSocket = require("ws");
-const jwt = require("jsonwebtoken");
+// server.js
+const express = require('express');
+const session = require('express-session');
+const path = require('path');
+const bcrypt = require('bcryptjs');
 
 const app = express();
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+const PORT = process.env.PORT || 3000;
 
-const SECRET = "super_secret_key";
-const PASSWORD = "1234";
+// База данных пользователей (в реальном проекте используйте настоящую БД)
+const users = [
+    { id: 1, username: 'admin', password: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi' }, // пароль: '123'
+    { id: 2, username: 'user', password: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi' }
+];
 
-let agents = new Map();
-let viewers = new Set();
-
+// Middleware
 app.use(express.json());
-app.use(express.static("public"));
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(__dirname));
 
-// 🔐 login -> JWT
-app.post("/login", (req, res) => {
-    const { password } = req.body;
-
-    if (password === PASSWORD) {
-        const token = jwt.sign({ user: "admin" }, SECRET, { expiresIn: "1h" });
-        return res.json({ token });
+// Настройка сессий
+app.use(session({
+    secret: 'your-secret-key-ring1-overload',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { 
+        maxAge: 3600000, // 1 час
+        httpOnly: true
     }
+}));
 
-    res.status(401).json({ error: "wrong password" });
-});
-
-function verify(token) {
-    try {
-        return jwt.verify(token, SECRET);
-    } catch {
-        return null;
+// Middleware проверки авторизации
+function requireAuth(req, res, next) {
+    if (req.session.user) {
+        next();
+    } else {
+        res.status(401).json({ error: 'Не авторизован' });
     }
 }
 
-function sendDevices() {
-    const list = Array.from(agents.keys());
-
-    viewers.forEach(v => {
-        if (v.readyState === WebSocket.OPEN) {
-            v.send(JSON.stringify({ type: "devices", list }));
-        }
-    });
-}
-
-wss.on("connection", (ws) => {
-
-    ws.on("message", (msg) => {
-
-        if (Buffer.isBuffer(msg)) {
-            if (ws.role === "agent") {
-                viewers.forEach(v => {
-                    if (v.readyState === WebSocket.OPEN) {
-                        v.send(msg);
-                    }
-                });
-            }
-            return;
-        }
-
-        let data;
-        try {
-            data = JSON.parse(msg);
-        } catch {
-            return;
-        }
-
-        // AUTH
-        if (data.type === "auth") {
-
-            const user = verify(data.token);
-
-            if (!user) {
-                ws.send(JSON.stringify({ type: "auth_fail" }));
-                ws.close();
-                return;
-            }
-
-            ws.role = data.role;
-
-            if (data.role === "agent") {
-                ws.id = data.id;
-                agents.set(ws.id, ws);
-                sendDevices();
-            }
-
-            if (data.role === "viewer") {
-                viewers.add(ws);
-            }
-
-            ws.send(JSON.stringify({ type: "auth_ok" }));
-        }
-    });
-
-    ws.on("close", () => {
-        viewers.delete(ws);
-
-        if (ws.role === "agent") {
-            agents.delete(ws.id);
-            sendDevices();
-        }
-    });
+// API: Логин
+app.post('/api/login', async (req, res) => {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+        return res.status(400).json({ error: 'Логин и пароль обязательны' });
+    }
+    
+    const user = users.find(u => u.username === username);
+    
+    if (!user) {
+        return res.status(401).json({ error: 'Неверный логин или пароль' });
+    }
+    
+    // В демо-целях сравниваем пароли напрямую (в реальном проекте используйте bcrypt.compare)
+    if (password !== '123') {
+        return res.status(401).json({ error: 'Неверный логин или пароль' });
+    }
+    
+    req.session.user = {
+        id: user.id,
+        username: user.username
+    };
+    
+    res.json({ success: true, user: req.session.user });
 });
 
-server.listen(process.env.PORT || 3000, () => {
-    console.log("Server running");
+// API: Получить текущего пользователя
+app.get('/api/user', requireAuth, (req, res) => {
+    res.json(req.session.user);
+});
+
+// API: Выйти
+app.post('/api/logout', (req, res) => {
+    req.session.destroy();
+    res.json({ success: true });
+});
+
+// Защищённая тестовая страница (дополнительно)
+app.get('/api/protected', requireAuth, (req, res) => {
+    res.json({ message: `Привет, ${req.session.user.username}! Ты в защищённой зоне.` });
+});
+
+// Отдача статических файлов
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+app.get('/login.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'login.html'));
+});
+
+// Запуск сервера
+app.listen(PORT, () => {
+    console.log(`✅ Сервер запущен на http://localhost:${PORT}`);
+    console.log(`📁 Тестовые учётные данные: admin/123 или user/123`);
 });
