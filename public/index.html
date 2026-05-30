@@ -1,1 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Screen Viewer</title>
+    <style>
+        body {
+            background:#111;
+            color:white;
+            text-align:center;
+            font-family: Arial;
+        }
 
+        img {
+            width:90%;
+            margin-top:20px;
+            border:2px solid #444;
+        }
+
+        select, button {
+            padding:8px;
+            margin:5px;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Screen Viewer Panel</h2>
+
+<select id="devices"></select>
+<button onclick="connect()">Connect</button>
+
+<br>
+
+<img id="screen">
+
+<script>
+const token = localStorage.getItem("token");
+
+if (!token) {
+    window.location.href = "/login.html";
+}
+
+let ws;
+
+function connect() {
+    ws = new WebSocket(location.origin.replace("https","wss").replace("http","ws"));
+
+    ws.binaryType = "arraybuffer";
+
+    ws.onopen = () => {
+        ws.send(JSON.stringify({
+            type: "auth",
+            role: "viewer",
+            token: token
+        }));
+    };
+
+    ws.onmessage = (e) => {
+
+        if (typeof e.data === "string") {
+            const msg = JSON.parse(e.data);
+
+            if (msg.type === "devices") {
+                const sel = document.getElementById("devices");
+                sel.innerHTML = "";
+
+                msg.list.forEach(id => {
+                    const opt = document.createElement("option");
+                    opt.value = id;
+                    opt.text = id;
+                    sel.appendChild(opt);
+                });
+            }
+        }
+
+        if (e.data instanceof ArrayBuffer) {
+            const blob = new Blob([e.data], { type: "image/jpeg" });
+            document.getElementById("screen").src = URL.createObjectURL(blob);
+        }
+    };
+}
+</script>
+
+</body>
+</html>
